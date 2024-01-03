@@ -4,6 +4,7 @@ import (
 	"idp_fosite/oauth"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ory/fosite/handler/openid"
@@ -32,6 +33,14 @@ func authenticate(w http.ResponseWriter, r *http.Request) {
 		Headers: &jwt.Headers{
 			Extra: make(map[string]interface{}),
 		},
+	}
+
+	// MEMO: fositeでやってくれてもいい気がする
+	scopes := strings.Split(r.URL.Query().Get("scope"), " ")
+	for _, s := range scopes {
+		if len(s) > 0 {
+			ar.GrantScope(s)
+		}
 	}
 
 	response, err := oauth.OAuth2Provider.NewAuthorizeResponse(ctx, ar, sess)

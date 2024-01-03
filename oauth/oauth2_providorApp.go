@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ory/fosite"
-	"github.com/ory/fosite/handler/openid"
 )
 
 var db sync.Map
@@ -28,18 +27,22 @@ func (a OAuth2ProvidorApp) GetClient(ctx context.Context, id string) (fosite.Cli
 }
 
 func (a OAuth2ProvidorApp) CreateOpenIDConnectSession(ctx context.Context, authorizeCode string, requester fosite.Requester) error {
-	sess, ok := requester.GetSession().(*openid.DefaultSession)
-	if !ok {
-		return errors.New("not openid.DefaultSession")
-	}
-	db.Store(sess.Claims.Subject, sess)
-	db.Store(sess.Claims.Subject+"authorizeCode", authorizeCode)
+	// *fosite.Request
+	db.Store(authorizeCode, requester)
 	return nil
 }
 
 func (a OAuth2ProvidorApp) GetOpenIDConnectSession(ctx context.Context, authorizeCode string, requester fosite.Requester) (fosite.Requester, error) {
-	// TODO: 実装
-	return nil, nil
+	r, ok := db.Load(authorizeCode)
+	if !ok {
+		return nil, errors.New("not regist authorizeCode")
+	}
+	req, ok := r.(*fosite.Request)
+	if !ok {
+		return nil, errors.New("faild req assertion to fosite.AuthorizeRequest")
+	}
+
+	return req, nil
 }
 
 func (a OAuth2ProvidorApp) DeleteOpenIDConnectSession(ctx context.Context, authorizeCode string) error {
@@ -48,18 +51,22 @@ func (a OAuth2ProvidorApp) DeleteOpenIDConnectSession(ctx context.Context, autho
 }
 
 func (a OAuth2ProvidorApp) CreateAuthorizeCodeSession(ctx context.Context, code string, request fosite.Requester) error {
-	sess, ok := request.GetSession().(*openid.DefaultSession)
-	if !ok {
-		return errors.New("not openid.DefaultSession")
-	}
-	db.Store(sess.Claims.Subject, sess)
-	db.Store(sess.Claims.Subject+"authorizeCode", code)
+	// *fosite.Request
+	db.Store(code, request)
 	return nil
 }
 
 func (a OAuth2ProvidorApp) GetAuthorizeCodeSession(ctx context.Context, code string, session fosite.Session) (fosite.Requester, error) {
-	// TODO: 実装
-	return nil, nil
+	r, ok := db.Load(code)
+	if !ok {
+		return nil, errors.New("not regist authorizeCode")
+	}
+	req, ok := r.(*fosite.Request)
+	if !ok {
+		return nil, errors.New("faild req assertion to fosite.AuthorizeRequest")
+	}
+
+	return req, nil
 }
 
 func (a OAuth2ProvidorApp) InvalidateAuthorizeCodeSession(ctx context.Context, code string) error {
@@ -68,18 +75,28 @@ func (a OAuth2ProvidorApp) InvalidateAuthorizeCodeSession(ctx context.Context, c
 }
 
 func (a OAuth2ProvidorApp) CreateAccessTokenSession(ctx context.Context, signature string, request fosite.Requester) error {
-	// TODO: 実装
+	// *fosite.Request
+	db.Store(signature, request)
 	return nil
 }
 
 func (a OAuth2ProvidorApp) CreateRefreshTokenSession(ctx context.Context, signature string, request fosite.Requester) error {
-	// TODO: 実装
+	// *fosite.Request
+	db.Store(signature, request)
 	return nil
 }
 
 func (a OAuth2ProvidorApp) GetAccessTokenSession(ctx context.Context, signature string, session fosite.Session) (fosite.Requester, error) {
-	// TODO: 実装
-	return nil, nil
+	r, ok := db.Load(signature)
+	if !ok {
+		return nil, errors.New("not regist AccessTokenSession")
+	}
+	req, ok := r.(*fosite.Request)
+	if !ok {
+		return nil, errors.New("faild req assertion to fosite.Request")
+	}
+
+	return req, nil
 }
 
 func (a OAuth2ProvidorApp) DeleteAccessTokenSession(ctx context.Context, signature string) error {
@@ -88,8 +105,16 @@ func (a OAuth2ProvidorApp) DeleteAccessTokenSession(ctx context.Context, signatu
 }
 
 func (a OAuth2ProvidorApp) GetRefreshTokenSession(ctx context.Context, signature string, session fosite.Session) (fosite.Requester, error) {
-	// TODO: 実装
-	return nil, nil
+	r, ok := db.Load(signature)
+	if !ok {
+		return nil, errors.New("not regist RefreshTokenSession")
+	}
+	req, ok := r.(*fosite.Request)
+	if !ok {
+		return nil, errors.New("faild req assertion to fosite.Request")
+	}
+
+	return req, nil
 }
 
 func (a OAuth2ProvidorApp) DeleteRefreshTokenSession(ctx context.Context, signature string) error {

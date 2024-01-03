@@ -14,6 +14,7 @@ type Client struct {
 	GrantTypes    fosite.Arguments
 	ResponseTypes fosite.Arguments
 	Scopes        fosite.Arguments
+	AuthMethod    string
 }
 
 var (
@@ -36,6 +37,7 @@ func init() {
 		GrantTypes:    fosite.Arguments{"authorization_code", "refresh_token"},
 		ResponseTypes: fosite.Arguments{"code"},
 		Scopes:        fosite.Arguments{"openid"},
+		AuthMethod:    "client_secret_post",
 	}
 
 	secret2, _ := hasher.Hash(context.Background(), []byte("client2"))
@@ -46,6 +48,7 @@ func init() {
 		GrantTypes:    fosite.Arguments{"client_credentials"},
 		ResponseTypes: fosite.Arguments{},
 		Scopes:        fosite.Arguments{"sample"},
+		AuthMethod:    "client_secret_post",
 	}
 
 }
@@ -80,4 +83,8 @@ func (c *Client) GetResponseTypes() fosite.Arguments {
 
 func (c *Client) GetScopes() fosite.Arguments {
 	return c.Scopes
+}
+
+func (c *Client) GetTokenEndpointAuthMethod() string {
+	return c.AuthMethod
 }
