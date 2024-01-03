@@ -17,9 +17,7 @@ func main() {
 	r.Use(middleware.Logger)
 
 	r.Get("/callback", func(w http.ResponseWriter, r *http.Request) {
-		token := tokenReqest(r)
-		fmt.Println("-------token------")
-		fmt.Println(token)
+		token := tokenRequest(r)
 		w.Write([]byte(token))
 		return
 	})
@@ -27,9 +25,9 @@ func main() {
 	http.ListenAndServe(":3846", r)
 }
 
-func tokenReqest(r *http.Request) string {
+func tokenRequest(r *http.Request) string {
 	code := r.URL.Query().Get("code")
-	// 送信するデータを作成
+
 	data := url.Values{}
 	data.Add("grant_type", "authorization_code")
 	data.Add("code", code)
@@ -45,7 +43,6 @@ func tokenReqest(r *http.Request) string {
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	// HTTPクライアントを作成してリクエストを送信
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
