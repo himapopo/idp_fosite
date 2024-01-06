@@ -2,6 +2,7 @@ package main
 
 import (
 	"client/client"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -87,10 +88,9 @@ func main() {
 
 				data := url.Values{}
 				data.Add("grant_type", "client_credentials")
-				data.Add("client_id", c.ID)
-				data.Add("client_secret", c.Secret)
+				data.Add("scope", "sample offline")
 
-				b := tokenRequest(r, data)
+				b := tokenRequest(r, c, data)
 
 				var tokenRes TokenRes
 				if err := json.Unmarshal(b, &tokenRes); err != nil {
@@ -112,6 +112,8 @@ func main() {
 		state := r.URL.Query().Get("state")
 
 		cid, _ := stateDB.Load(state)
+		stateDB.Delete(state)
+
 		id, _ := cid.(string)
 		c := client.GetClient(id)
 		if c == nil {
@@ -122,10 +124,8 @@ func main() {
 		data.Add("grant_type", "authorization_code")
 		data.Add("code", code)
 		data.Add("redirect_uri", "http://localhost:3846/callback")
-		data.Add("client_id", c.ID)
-		data.Add("client_secret", c.Secret)
 
-		b := tokenRequest(r, data)
+		b := tokenRequest(r, c, data)
 
 		w.Write(b)
 		return
@@ -134,14 +134,18 @@ func main() {
 	http.ListenAndServe(":3846", r)
 }
 
-func tokenRequest(r *http.Request, values url.Values) []byte {
+func tokenRequest(r *http.Request, c *client.Client, values url.Values) []byte {
 	req, err := http.NewRequest("POST", "http://localhost:3000/oauth2/token", strings.NewReader(values.Encode()))
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 		return nil
 	}
 
+	src := []byte(c.ID + ":" + c.Secret)
+	enc := base64.StdEncoding.EncodeToString(src)
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Basic "+enc)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)

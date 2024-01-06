@@ -96,7 +96,30 @@ func token(w http.ResponseWriter, r *http.Request) {
 }
 
 func introspect(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
+	sess := &openid.DefaultSession{
+		Claims: &jwt.IDTokenClaims{
+			Issuer:      "",
+			Subject:     "taiki",
+			Audience:    []string{""},
+			ExpiresAt:   time.Now().Add(time.Hour * 6),
+			IssuedAt:    time.Now(),
+			RequestedAt: time.Now(),
+			AuthTime:    time.Now(),
+		},
+		Headers: &jwt.Headers{
+			Extra: make(map[string]interface{}),
+		},
+	}
+	ir, err := oauth.OAuth2Provider.NewIntrospectionRequest(ctx, r, sess)
+	if err != nil {
+		log.Printf("Error occurred in NewIntrospectionRequest: %+v", err)
+		oauth.OAuth2Provider.WriteIntrospectionError(ctx, w, err)
+		return
+	}
+
+	oauth.OAuth2Provider.WriteIntrospectionResponse(ctx, w, ir)
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {

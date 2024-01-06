@@ -37,7 +37,7 @@ func init() {
 		GrantTypes:    fosite.Arguments{"authorization_code", "refresh_token"},
 		ResponseTypes: fosite.Arguments{"code"},
 		Scopes:        fosite.Arguments{"openid", "offline"},
-		AuthMethod:    "client_secret_post",
+		AuthMethod:    "client_secret_basic",
 	}
 
 	secret2, _ := hasher.Hash(context.Background(), []byte("client2"))
@@ -48,7 +48,7 @@ func init() {
 		GrantTypes:    fosite.Arguments{"client_credentials"},
 		ResponseTypes: fosite.Arguments{},
 		Scopes:        fosite.Arguments{"sample", "offline"},
-		AuthMethod:    "client_secret_post",
+		AuthMethod:    "client_secret_basic",
 	}
 
 }
