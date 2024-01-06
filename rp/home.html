@@ -9,6 +9,25 @@
  <h1>Home</h1>
  <p>ID: {{ .ID }}</p>
  <p>Name: {{ .Name }}</p>
- <a href=/client/{{.ID}}/auth_request>認可コードフロー</a>
+
+  {{ $clietCredentialsFlow := false }}
+  {{ $authorizationCodeFlow := false }}
+
+  {{ range $i, $v := .GrantTypes }}
+    {{ if eq $v "client_credentials" }}
+        {{ $clietCredentialsFlow = true }}
+    {{ end }}
+    {{ if eq $v "authorization_code" }}
+        {{ $authorizationCodeFlow = true }}
+    {{ end }}
+  {{ end }}
+
+  {{ if $clietCredentialsFlow }}
+    <a href=/client/{{.ID}}/client_credentials_request>クライアントクレデンシャルズフロー</a>
+  {{ end }}
+
+  {{ if $authorizationCodeFlow }}
+    <a href=/client/{{.ID}}/auth_request>認可コードフロー</a>
+  {{ end }}
 </body>
 </html>

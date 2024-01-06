@@ -1,6 +1,7 @@
 package main
 
 import (
+	"client/client"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,51 +14,17 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/google/uuid"
-	"github.com/ory/fosite"
 )
 
 var stateDB = &sync.Map{}
 
-type Client struct {
-	ID            string
-	Name          string
-	Secret        string
-	RedirectURIs  []string
-	GrantTypes    fosite.Arguments
-	ResponseTypes fosite.Arguments
-	Scopes        fosite.Arguments
-	AuthMethod    string
-}
-
 type TokenRes struct {
-	Client
+	client.Client
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	IDToken      string `json:"id_token"`
 	Expire       int    `json:"expires_in"`
 	Scope        string `json:"scope"`
-}
-
-var (
-	Client1 = &Client{
-		ID:           "1",
-		Name:         "太紀のアプリケーション",
-		Secret:       "client1",
-		RedirectURIs: []string{"http://localhost:3846/callback"},
-		Scopes:       fosite.Arguments{"openid"},
-	}
-	Client2 *Client
-
-	Clients = []*Client{Client1, Client2}
-)
-
-func getClient(id string) *Client {
-	for _, c := range Clients {
-		if id == c.ID {
-			return c
-		}
-	}
-	return nil
 }
 
 func main() {
@@ -69,7 +36,7 @@ func main() {
 		// ホーム画面
 		r.Route("/{id}", func(r chi.Router) {
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				c := getClient(chi.URLParam(r, "id"))
+				c := client.GetClient(chi.URLParam(r, "id"))
 				if c == nil {
 					panic("client not found")
 				}
@@ -82,23 +49,17 @@ func main() {
 			// 認可コードリクエスト
 			// トークン受け取って表示
 			r.Get("/auth_request", func(w http.ResponseWriter, r *http.Request) {
-				c := getClient(chi.URLParam(r, "id"))
+				c := client.GetClient(chi.URLParam(r, "id"))
 				if c == nil {
 					panic("client not found")
 				}
 				uid := uuid.New().String()
 				stateDB.Store(uid, chi.URLParam(r, "id"))
 
-				url := fmt.Sprintf("http://localhost:3000/oauth2/auth?response_type=code&client_id=%s&state=%s&redirect_uri=%s&scope=%s", c.ID, uid, c.RedirectURIs[0], strings.Join(c.Scopes, " "))
+				url := fmt.Sprintf("http://localhost:3000/oauth2/auth?response_type=code&client_id=%s&state=%s&redirect_uri=%s&scope=%s", c.ID, uid, c.RedirectURIs[0], strings.Join(c.Scopes, "+"))
 
 				res, _ := http.Get(url)
-				// if err != nil {
-				// 	panic(err)
-				// }
 
-				if res == nil {
-					return
-				}
 				defer res.Body.Close()
 
 				b, err := io.ReadAll(res.Body)
@@ -114,18 +75,58 @@ func main() {
 				tokenRes.ID = c.ID
 				tokenRes.Name = c.Name
 
-				tmp := template.Must(template.ParseFiles("token.html"))
-				if err := tmp.Execute(w, tokenRes); err != nil {
+				renderHTML(w, "token.html", tokenRes)
+			})
+
+			// クライアントクレデンシャルズフロー
+			r.Get("/client_credentials_request", func(w http.ResponseWriter, r *http.Request) {
+				c := client.GetClient(chi.URLParam(r, "id"))
+				if c == nil {
+					panic("client not found")
+				}
+
+				data := url.Values{}
+				data.Add("grant_type", "client_credentials")
+				data.Add("client_id", c.ID)
+				data.Add("client_secret", c.Secret)
+
+				b := tokenRequest(r, data)
+
+				var tokenRes TokenRes
+				if err := json.Unmarshal(b, &tokenRes); err != nil {
 					panic(err)
 				}
-				return
+
+				tokenRes.ID = c.ID
+				tokenRes.Name = c.Name
+
+				renderHTML(w, "token.html", tokenRes)
 			})
 		})
 	})
 
 	// 内部でトークンリクエスト
 	r.Get("/callback", func(w http.ResponseWriter, r *http.Request) {
-		b := tokenRequest(r)
+
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+
+		cid, _ := stateDB.Load(state)
+		id, _ := cid.(string)
+		c := client.GetClient(id)
+		if c == nil {
+			panic("client not found")
+		}
+
+		data := url.Values{}
+		data.Add("grant_type", "authorization_code")
+		data.Add("code", code)
+		data.Add("redirect_uri", "http://localhost:3846/callback")
+		data.Add("client_id", c.ID)
+		data.Add("client_secret", c.Secret)
+
+		b := tokenRequest(r, data)
+
 		w.Write(b)
 		return
 	})
@@ -133,25 +134,8 @@ func main() {
 	http.ListenAndServe(":3846", r)
 }
 
-func tokenRequest(r *http.Request) []byte {
-	code := r.URL.Query().Get("code")
-	state := r.URL.Query().Get("state")
-
-	cid, _ := stateDB.Load(state)
-	id, _ := cid.(string)
-	c := getClient(id)
-	if c == nil {
-		panic("client not found")
-	}
-
-	data := url.Values{}
-	data.Add("grant_type", "authorization_code")
-	data.Add("code", code)
-	data.Add("redirect_uri", "http://localhost:3846/callback")
-	data.Add("client_id", c.ID)
-	data.Add("client_secret", c.Secret)
-
-	req, err := http.NewRequest("POST", "http://localhost:3000/oauth2/token", strings.NewReader(data.Encode()))
+func tokenRequest(r *http.Request, values url.Values) []byte {
+	req, err := http.NewRequest("POST", "http://localhost:3000/oauth2/token", strings.NewReader(values.Encode()))
 	if err != nil {
 		fmt.Println("Error creating request:", err)
 		return nil
@@ -170,4 +154,11 @@ func tokenRequest(r *http.Request) []byte {
 	b, err := io.ReadAll(resp.Body)
 
 	return b
+}
+
+func renderHTML(w http.ResponseWriter, file string, data any) {
+	tmp := template.Must(template.ParseFiles(file))
+	if err := tmp.Execute(w, data); err != nil {
+		panic(err)
+	}
 }

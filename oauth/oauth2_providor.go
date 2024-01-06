@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"time"
 
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/compose"
@@ -16,8 +15,7 @@ var secret = []byte("my super secret signing password")
 var privateKey, _ = rsa.GenerateKey(rand.Reader, 2048)
 
 var config = &fosite.Config{
-	AccessTokenLifespan: time.Minute * 30,
-	GlobalSecret:        secret,
+	GlobalSecret: secret,
 }
 
 var keyGetter = func(context.Context) (interface{}, error) {
